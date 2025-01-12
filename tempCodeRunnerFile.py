@@ -1,0 +1,1 @@
+https://visa.vfsglobal.com/tur/tr/pol/login
