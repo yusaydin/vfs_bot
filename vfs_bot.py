@@ -7,68 +7,80 @@ from selenium.webdriver.support import expected_conditions as EC
 import time
 import subprocess
 import os
-import winsound  # En üste eklenecek
+import winsound  # For playing alert sounds
 
 def play_error_sound():
-    # 1000 Hz'de 1000ms (1 saniye) süreyle hata sesi çal
+    """Play error sound (1000Hz for 1 second) to alert user of an error"""
     winsound.Beep(1000, 1000)
 
 def play_success_sound():
-    # 3 kez 2000 Hz'de başarı sesi çal
+    """Play success sound (2000Hz, 3 times) to alert user when appointment is found"""
     for _ in range(3):
         winsound.Beep(2000, 500)
         time.sleep(0.1)
 
 def start_chrome_debug():
+    """
+    Start Chrome in debug mode with custom profile and security settings.
+    Returns:
+        bool: True if Chrome started successfully, False otherwise
+    """
     try:
+        # Try to find Chrome executable in both Program Files locations
         chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
         if not os.path.exists(chrome_path):
             chrome_path = r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
         
-        # Farklı port ve profil dizini kullan
+        # Create unique profile directory for debugging session
         user_data_dir = os.path.join(os.path.expanduser("~"), "chrome_debug_profile")
         
-        # Chrome argümanlarını genişlet
+        # Configure Chrome launch arguments for automation
         chrome_args = [
             chrome_path,
-            f"--remote-debugging-port=9223",  # Farklı port
+            f"--remote-debugging-port=9223",  # Custom debugging port
             f"--user-data-dir={user_data_dir}",
-            "--disable-blink-features=AutomationControlled",  # Otomasyon belirtecini gizle
-            "--disable-web-security",
+            "--disable-blink-features=AutomationControlled",  # Hide automation flags
+            "--disable-web-security",  # Required for VFS site
             "--disable-features=IsolateOrigins,site-per-process",
             "--no-sandbox",
-            "--window-size=1920,1080"
+            "--window-size=1920,1080"  # Full HD resolution
         ]
         
-        # Önceki profili temizle
+        # Clean up old profile if exists
         if os.path.exists(user_data_dir):
             try:
                 import shutil
                 shutil.rmtree(user_data_dir)
-                time.sleep(1)
+                time.sleep(1)  # Wait for cleanup
             except:
                 pass
         
+        # Launch Chrome with debug options
         subprocess.Popen(chrome_args)
-        print("Chrome debug modunda başlatıldı")
-        time.sleep(5)  # Bekleme süresini artır
+        print("Chrome started in debug mode")
+        time.sleep(5)  # Wait for Chrome to initialize
         return True
         
     except Exception as e:
-        print(f"Chrome başlatma hatası: {e}")
+        print(f"Failed to start Chrome: {e}")
         return False
 
 def connect_to_existing_browser():
+    """
+    Connect to the running Chrome instance in debug mode.
+    Returns:
+        webdriver: Configured Chrome WebDriver instance
+    """
     chrome_options = Options()
     chrome_options.add_experimental_option("debuggerAddress", "127.0.0.1:9223")
     
-    # Basitleştirilmiş options - sadece gerekli olanlar
+    # Simplified options - only necessary ones
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     chrome_options.add_argument('--disable-extensions')
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
     
-    # ChromeDriver'ı otomatik indir
+    # Automatically download ChromeDriver
     from selenium.webdriver.chrome.service import Service
     from webdriver_manager.chrome import ChromeDriverManager
     
@@ -77,12 +89,24 @@ def connect_to_existing_browser():
     return driver
 
 def fill_form(driver, user_data, input_start_id, base_select_id):
+    """
+    Fill the VFS application form with user data.
+    
+    Args:
+        driver: Selenium WebDriver instance
+        user_data (dict): User's personal information
+        input_start_id (int): Base ID for input fields
+        base_select_id (int): Base ID for dropdown fields
+    
+    Returns:
+        bool: True if form filled successfully, False otherwise
+    """
     try:
-        print("\nForm doldurma işlemi başlıyor...")
-        print(f"Kullanılan ID'ler - Input: {input_start_id}, Select: {base_select_id}")
+        print("\nForm filling process starts...")
+        print(f"Used IDs - Input: {input_start_id}, Select: {base_select_id}")
         time.sleep(5)
 
-        # Text input alanları - XPath ile
+        # Text input fields - with XPath
         for field_name, id_offset in {
             'first_name': 0,
             'last_name': 1,
@@ -93,7 +117,7 @@ def fill_form(driver, user_data, input_start_id, base_select_id):
         }.items():
             try:
                 current_id = f"mat-input-{input_start_id + id_offset}"
-                print(f"[ID: {input_start_id + id_offset}] {field_name} alanı dolduruluyor (Element ID: {current_id})...")
+                print(f"[ID: {input_start_id + id_offset}] Filling {field_name} field (Element ID: {current_id})...")
                 
                 element = WebDriverWait(driver, 10).until(
                     EC.presence_of_element_located((By.XPATH, f'//*[@id="{current_id}"]'))
@@ -106,39 +130,39 @@ def fill_form(driver, user_data, input_start_id, base_select_id):
                 else:
                     element.send_keys(user_data[field_name])
                 time.sleep(1)
-                print(f"[ID: {input_start_id + id_offset}] {field_name} alanı dolduruldu")
+                print(f"[ID: {input_start_id + id_offset}] {field_name} field filled")
                 
             except Exception as e:
-                error_msg = f"[ID: {input_start_id + id_offset}] {field_name} doldurulurken hata: Message: {str(e)}"
+                error_msg = f"[ID: {input_start_id + id_offset}] Error filling {field_name}: Message: {str(e)}"
                 print(error_msg)
-                play_error_sound()  # Hata sesi çal
+                play_error_sound()  # Play error sound
                 raise Exception(error_msg)
 
-        # Dropdown menüler için yeni işlem
+        # New process for dropdown menus
         dropdowns = {
             'gender': {
-                'button': f'//*[@id="mat-select-value-1"]',  # ID'yi dinamik hale getir
+                'button': f'//*[@id="mat-select-value-1"]',  # Make ID dynamic
                 'value': user_data['gender'],
-                'select_id': base_select_id  # base_select_id global değişkeninden gelecek
+                'select_id': base_select_id  # Will come from base_select_id global variable
             },
             'nationality': {
-                'button': f'//*[@id="mat-select-value-3"]',  # ID'yi dinamik hale getir
+                'button': f'//*[@id="mat-select-value-3"]',  # Make ID dynamic
                 'value': 'Turkiye',
-                'select_id': base_select_id + 2  # gender'dan 2 fazla
+                'select_id': base_select_id + 2  # 2 more than gender
             }
         }
         
         for dropdown_name, data in dropdowns.items():
             try:
-                print(f"[ID: {data['select_id']}] {dropdown_name} seçimi yapılıyor...")
-                # Dropdown'ı aç
+                print(f"[ID: {data['select_id']}] Selecting {dropdown_name}...")
+                # Open dropdown
                 dropdown = WebDriverWait(driver, 10).until(
                     EC.element_to_be_clickable((By.XPATH, f'//*[@id="mat-select-value-{data["select_id"]}"]'))
                 )
                 driver.execute_script("arguments[0].click();", dropdown)
                 time.sleep(2)
                 
-                # JavaScript ile seçeneği bul ve tıkla
+                # Find and click option with JavaScript
                 js_script = """
                 function selectOption(searchText) {
                     const panel = document.querySelector('.mat-mdc-select-panel');
@@ -157,13 +181,13 @@ def fill_form(driver, user_data, input_start_id, base_select_id):
                 return selectOption(arguments[0]);
                 """
                 
-                # Gender için tam metin eşleşmesi kullan
+                # Use exact text match for gender
                 value_to_search = data['value']
-                if dropdown_name == 'gender':
-                    print(f"Gender değeri aranıyor: {value_to_search}")
+                if (dropdown_name == 'gender'):
+                    print(f"Searching for gender value: {value_to_search}")
                     found = driver.execute_script(js_script, value_to_search)
                 else:
-                    # Nationality için alternatif değerleri dene
+                    # Try alternative values for nationality
                     found = driver.execute_script(js_script, value_to_search)
                     if not found:
                         alternate_values = {
@@ -174,59 +198,59 @@ def fill_form(driver, user_data, input_start_id, base_select_id):
                             for alt_value in alternate_values[value_to_search]:
                                 found = driver.execute_script(js_script, alt_value)
                                 if found:
-                                    print(f"{dropdown_name} için alternatif değer {alt_value} seçildi")
+                                    print(f"Alternative value {alt_value} selected for {dropdown_name}")
                                     break
 
                 if not found:
-                    raise Exception(f"{value_to_search} seçeneği bulunamadı")
+                    raise Exception(f"Option {value_to_search} not found")
                 
-                print(f"{dropdown_name} seçimi tamamlandı")
+                print(f"{dropdown_name} selection completed")
                 time.sleep(1)
                 
             except Exception as e:
-                error_msg = f"[ID: {data['select_id']}] {dropdown_name} seçilirken hata: {str(e)}"
+                error_msg = f"[ID: {data['select_id']}] Error selecting {dropdown_name}: {str(e)}"
                 print(error_msg)
-                play_error_sound()  # Hata sesi çal
+                play_error_sound()  # Play error sound
                 raise Exception(error_msg)
 
-        # Save butonu - CSS Selector ile
+        # Save button - with CSS Selector
         try:
-            print("Form kaydediliyor...")
+            print("Saving form...")
             
-            # Sayfanın en altına scroll yapma işlemini iyileştir
+            # Improve scroll to bottom of the page
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(1)
-            driver.execute_script("window.scrollBy(0, -150);")  # Biraz yukarı kaydır
+            driver.execute_script("window.scrollBy(0, -150);")  # Scroll up a bit
             time.sleep(1)
             
-            # Save butonunu CSS Selector ile bul
+            # Find save button with CSS Selector
             save_button_css = "button.mdc-button.btn-brand-orange"
             save_button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, save_button_css))
             )
             
-            # Butona görünür olana kadar scroll yap
+            # Scroll to button until visible
             driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", save_button)
             time.sleep(2)
             
-            # Farklı tıklama yöntemlerini dene
+            # Try different click methods
             try:
-                # JavaScript ile tıkla
+                # Click with JavaScript
                 driver.execute_script("arguments[0].click();", save_button)
                 time.sleep(2)
                 
-                # URL değişimini bekle
+                # Wait for URL change
                 WebDriverWait(driver, 5).until(
                     lambda driver: "applicationdetails" in driver.current_url
                 )
-                print("Form başarıyla kaydedildi")
+                print("Form saved successfully")
                 return True
                 
             except Exception as e:
-                print(f"Tıklama hatası, farklı seçici deneniyor: {str(e)}")
-                play_error_sound()  # Tıklama hatası için ses çal
+                print(f"Click error, trying different selector: {str(e)}")
+                play_error_sound()  # Play error sound for click error
                 
-                # Alternatif CSS selector dene
+                # Try alternative CSS selector
                 try:
                     alt_button = WebDriverWait(driver, 5).until(
                         EC.element_to_be_clickable((By.CSS_SELECTOR, "button.mat-mdc-outlined-button.btn-brand-orange"))
@@ -240,70 +264,75 @@ def fill_form(driver, user_data, input_start_id, base_select_id):
                     raise
             
         except Exception as e:
-            print(f"Kaydetme hatası: {str(e)}")
-            play_error_sound()  # Kaydetme hatası için ses çal
+            print(f"Save error: {str(e)}")
+            play_error_sound()  # Play error sound for save error
             raise
             
     except Exception as e:
-        print(f"Form doldurma hatası: {str(e)}")
-        play_error_sound()  # Form doldurma hatası için ses çal
+        print(f"Form filling error: {str(e)}")
+        play_error_sound()  # Play error sound for form filling error
         return False
 
 def check_appointment_loop(driver):
-    checkbox_base_ids = [1, 2, 3]  # İlk checkbox ID'leri
-    input_base_id = 6     # Input'lar için başlangıç ID'si
-    base_select_id = 1    # Select'ler için başlangıç ID'si (değiştirildi)
+    """
+    Main loop for checking appointment availability.
+    Handles the entire flow from dashboard to appointment selection.
+    """
+    # Initialize ID trackers for dynamic elements
+    checkbox_base_ids = [1, 2, 3]  # Base IDs for checkboxes
+    input_base_id = 6     # Base ID for input fields
+    base_select_id = 1    # Base ID for select/dropdown fields
     
     while True:
         try:
-            # Dashboard butonuna tıkla
+            # Dashboard button click
             dashboard_button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, "/html/body/app-root/div/main/div/app-dashboard/section[1]/div/div[1]/div[2]/button/span[2]"))
             )
             dashboard_button.click()
-            print("Dashboard butonuna tıklandı")
+            print("Clicked on Dashboard button")
             time.sleep(2)
             
-            # İlk sayfa checkbox'larını işaretle
-            print("\nİlk sayfa checkbox işlemleri başlıyor...")
+            # Check first page checkboxes
+            print("\nFirst page checkbox operations start...")
             checkbox_names = ["Conditions and Terms of Use", "Privacy Policy"]
             for i in range(2):
                 checkbox_id = f"mat-mdc-checkbox-{checkbox_base_ids[i]}-input"
-                print(f"[ID: {checkbox_base_ids[i]}] {checkbox_names[i]} checkbox'ı aranıyor (Element ID: {checkbox_id})...")
+                print(f"[ID: {checkbox_base_ids[i]}] Searching for {checkbox_names[i]} checkbox (Element ID: {checkbox_id})...")
                 checkbox = WebDriverWait(driver, 10).until(
                     EC.presence_of_element_located((By.XPATH, f'//*[@id="{checkbox_id}"]'))
                 )
                 driver.execute_script("arguments[0].click();", checkbox)
                 time.sleep(1)
-                print(f"[ID: {checkbox_base_ids[i]}] {checkbox_names[i]} checkbox'ı işaretlendi")
+                print(f"[ID: {checkbox_base_ids[i]}] {checkbox_names[i]} checkbox checked")
             
-            # Start New Booking butonuna tıkla
+            # Click Start New Booking button
             start_booking = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, "//button[contains(.,'Start New Booking')]"))
             )
             driver.execute_script("arguments[0].click();", start_booking)
-            print("Start New Booking tıklandı")
+            print("Clicked on Start New Booking")
             time.sleep(2)
             
-            # İkinci sayfa - Üçüncü checkbox
+            # Second page - Third checkbox
             checkbox_id = f"mat-mdc-checkbox-{checkbox_base_ids[2]}-input"
-            print(f"\n[ID: {checkbox_base_ids[2]}] İkinci sayfa Terms and Conditions checkbox'ı aranıyor (Element ID: {checkbox_id})...")
+            print(f"\n[ID: {checkbox_base_ids[2]}] Searching for second page Terms and Conditions checkbox (Element ID: {checkbox_id})...")
             checkbox3 = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.XPATH, f'//*[@id="{checkbox_id}"]'))
             )
             driver.execute_script("arguments[0].click();", checkbox3)
             time.sleep(1)
-            print(f"[ID: {checkbox_base_ids[2]}] İkinci sayfa Terms and Conditions checkbox'ı işaretlendi")
+            print(f"[ID: {checkbox_base_ids[2]}] Second page Terms and Conditions checkbox checked")
             
-            # İkinci sayfa Continue butonuna tıkla
+            # Click Continue button on second page
             continue_button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Continue')]"))
             )
             driver.execute_script("arguments[0].click();", continue_button)
-            print("İkinci sayfa Continue butonuna tıklandı")
+            print("Clicked on Continue button on second page")
             time.sleep(2)
             
-            # Form sayfasındaki işlemler - input ID'leri 6'şar artıyor
+            # Form page operations - input IDs increase by 6
             if "your-details" in driver.current_url:
                 user_data = {
                     'first_name': 'Yusuf',
@@ -324,50 +353,50 @@ def check_appointment_loop(driver):
                     'email': f'//*[@id="mat-input-{input_base_id + 5}"]'
                 }
                 if fill_form(driver, user_data, input_base_id, base_select_id):
-                    print("Form dolduruldu")
+                    print("Form filled")
             
-            # Randevu seçim sayfası
+            # Appointment selection page
             if "applicationdetails" in driver.current_url:
                 try:
-                    print("\nRandevu seçim işlemi başlıyor...")
+                    print("\nAppointment selection process starts...")
                     time.sleep(2)
                     
-                    # İlk dropdown (Uzun Dönem) - base_select_id + 4
+                    # First dropdown (Long Term) - base_select_id + 4
                     first_dropdown = WebDriverWait(driver, 10).until(
                         EC.element_to_be_clickable((By.CSS_SELECTOR, f"#mat-select-value-{base_select_id + 4}"))
                     )
                     first_dropdown.click()
                     time.sleep(1)
                     
-                    # "1 - Uzun Donem" seçeneğini seç
+                    # Select "1 - Uzun Donem" option
                     long_term_option = WebDriverWait(driver, 10).until(
                         EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), '1 - Uzun Donem')]"))
                     )
                     long_term_option.click()
                     time.sleep(2)
                     
-                    # İkinci dropdown (ERASMUS/NAWA/ECS) - base_select_id + 6
+                    # Second dropdown (ERASMUS/NAWA/ECS) - base_select_id + 6
                     second_dropdown = WebDriverWait(driver, 10).until(
                         EC.element_to_be_clickable((By.CSS_SELECTOR, f"#mat-select-value-{base_select_id + 6}"))
                     )
                     second_dropdown.click()
                     time.sleep(1)
                     
-                    # "5-ERASMUS/NAWA/ECS" seçeneğini seç
+                    # Select "5-ERASMUS/NAWA/ECS" option
                     erasmus_option = WebDriverWait(driver, 10).until(
                         EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), '5-ERASMUS/NAWA/ECS')]"))
                     )
                     erasmus_option.click()
                     time.sleep(2)
                     
-                    # Hata mesajını kontrol et
+                    # Check for error message
                     try:
                         error_message = WebDriverWait(driver, 3).until(
                             EC.presence_of_element_located((By.CSS_SELECTOR, "div.errorMessage.c-brand-error"))
                         )
-                        print("Randevu bulunamadı, tekrar deneniyor...")
+                        print("No appointment found, retrying...")
                         
-                        # Dashboard'a dön
+                        # Return to dashboard
                         account_button = WebDriverWait(driver, 10).until(
                             EC.element_to_be_clickable((By.XPATH, '//*[@id="navbarDropdown"]'))
                         )
@@ -378,124 +407,128 @@ def check_appointment_loop(driver):
                             EC.element_to_be_clickable((By.XPATH, '//*[@id="navbarToggle"]/ul/li/div/a[1]'))
                         )
                         dashboard_link.click()
-                        print("Dashboard'a dönülüyor...")
+                        print("Returning to dashboard...")
                         time.sleep(5)
                         
-                        # ID'leri güncelle (6 yerine 10 artır)
-                        checkbox_base_ids = [x + 3 for x in checkbox_base_ids]  # Her ID'ye 3 ekle
-                        input_base_id += 6     # Input ID'leri 6'şar artıyor
-                        base_select_id += 10   # Select ID'leri 10'ar artıyor
+                        # Update IDs (increase by 10 instead of 6)
+                        checkbox_base_ids = [x + 3 for x in checkbox_base_ids]  # Add 3 to each ID
+                        input_base_id += 6     # Input IDs increase by 6
+                        base_select_id += 10   # Select IDs increase by 10
                         continue
                         
                     except:
-                        # Hata mesajı yoksa üçüncü dropdown'ı kontrol et
+                        # If no error message, check third dropdown
                         third_dropdown = WebDriverWait(driver, 5).until(
                             EC.element_to_be_clickable((By.CSS_SELECTOR, f"#mat-select-value-{base_select_id + 8}"))
                         )
                         if "Uygulama merkezinizi seçin" in third_dropdown.text:
-                            print("Randevu bulundu!")
+                            print("Appointment found!")
                             play_success_sound()  # Added success sound
-                            input("İşleme devam etmek için Enter'a basın...")  # Kullanıcının kontrol etmesi için bekle
+                            input("Press Enter to continue...")  # Wait for user to check
                             return True
                 
                 except Exception as e:
-                    print(f"Randevu seçim hatası: {e}")
-                    checkbox_base_ids = [x + 3 for x in checkbox_base_ids]  # Her ID'ye 3 ekle
-                    input_base_id += 6     # Input ID'leri 6'şar artıyor
-                    base_select_id += 10   # Select ID'leri 10'ar artıyor
-                    # Dashboard'a dön
+                    print(f"Appointment selection error: {e}")
+                    checkbox_base_ids = [x + 3 for x in checkbox_base_ids]  # Add 3 to each ID
+                    input_base_id += 6     # Input IDs increase by 6
+                    base_select_id += 10   # Select IDs increase by 10
+                    # Return to dashboard
                     try:
                         account_button = driver.find_element(By.XPATH, '//*[@id="navbarDropdown"]')
                         account_button.click()
                         time.sleep(1)
                         dashboard_link = driver.find_element(By.XPATH, '//*[@id="navbarToggle"]/ul/li/div/a[1]')
                         dashboard_link.click()
-                        print("Hata sonrası dashboard'a dönülüyor...")
+                        print("Returning to dashboard after error...")
                         time.sleep(5)
                     except:
-                        print("Dashboard'a dönüş başarısız, yeniden deneniyor...")
+                        print("Failed to return to dashboard, retrying...")
                     continue
                     
         except Exception as e:
-            print(f"Genel hata: {e}")
+            print(f"General error: {e}")
             time.sleep(5)
             continue
 
 def check_appointments(driver):
-    # Global değişkenler tanımlayalım
+    """
+    Alternative implementation of appointment checking with better error handling
+    and ID management using dictionary-based tracking.
+    """
+    # Initialize global ID trackers
     global_ids = {
-        'checkbox_start': 1,  # Her döngüde checkbox ID'leri buradan başlayacak
-        'input_start': 6,     # Input ID'leri buradan başlayacak
-        'select_start': 1     # Select ID'leri 1'den başlayacak (değiştirildi)
+        'checkbox_start': 1,  # Base ID for checkboxes, increments by 3
+        'input_start': 6,     # Base ID for inputs, increments by 6
+        'select_start': 1     # Base ID for dropdowns, increments by 10
     }
     
     while True:
         try:
-            print("\nDashboard sayfası işlemleri başlıyor...")
-            print(f"Mevcut ID'ler - Checkbox: {global_ids['checkbox_start']}, Input: {global_ids['input_start']}, Select: {global_ids['select_start']}")
+            print("\nDashboard operations start...")
+            print(f"Current IDs - Checkbox: {global_ids['checkbox_start']}, Input: {global_ids['input_start']}, Select: {global_ids['select_start']}")
             
-            # İlk iki checkbox'ı işaretle
+            # Check first two checkboxes
             checkbox_names = ["Conditions and Terms of Use", "Privacy Policy"]
             for i in range(2):
                 try:
-                    current_id = global_ids['checkbox_start'] + (i * 1)  # Her checkbox için 1 artır
+                    current_id = global_ids['checkbox_start'] + (i * 1)  # Increase by 1 for each checkbox
                     checkbox_id = f"mat-mdc-checkbox-{current_id}-input"
-                    print(f"[ID: {current_id}] {checkbox_names[i]} checkbox'ı aranıyor (Element ID: {checkbox_id})...")
+                    print(f"[ID: {current_id}] Searching for {checkbox_names[i]} checkbox (Element ID: {checkbox_id})...")
                     
                     checkbox = WebDriverWait(driver, 10).until(
                         EC.presence_of_element_located((By.XPATH, f'//*[@id="{checkbox_id}"]'))
                     )
                     driver.execute_script("arguments[0].click();", checkbox)
                     time.sleep(1)
-                    print(f"[ID: {current_id}] {checkbox_names[i]} checkbox'ı işaretlendi")
+                    print(f"[ID: {current_id}] {checkbox_names[i]} checkbox checked")
                     
                 except Exception as e:
-                    print(f"[ID: {current_id}] {checkbox_names[i]} checkbox hatası: {str(e)}")
-                    # ID'leri güncelle ve yeniden dene
-                    global_ids['checkbox_start'] += 3  # Her hata sonrası 3 artır
-                    global_ids['input_start'] += 6    # Input ID'leri 6 artır
-                    global_ids['select_start'] += 10  # Select ID'leri 10 artır
+                    print(f"[ID: {current_id}] Error checking {checkbox_names[i]} checkbox: {str(e)}")
+                    # Update IDs and retry
+                    global_ids['checkbox_start'] += 3  # Increase by 3 after each error
+                    global_ids['input_start'] += 6    # Increase input IDs by 6
+                    global_ids['select_start'] += 10  # Increase select IDs by 10
                     continue
 
-            # Start New Booking butonu
-            print("\nStart New Booking butonu aranıyor...")
+            # Start New Booking button
+            print("\nSearching for Start New Booking button...")
             start_booking = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "button.btn-brand-orange"))
             )
             driver.execute_script("arguments[0].click();", start_booking)
-            print("Start New Booking tıklandı")
+            print("Clicked on Start New Booking")
             time.sleep(3)
             
-            # İkinci sayfa işlemleri
-            print("\nİkinci sayfa işlemleri başlıyor...")
+            # Second page operations
+            print("\nSecond page operations start...")
             try:
-                # Yeni checkbox'ı bekle ve tıkla
-                print("İkinci sayfa checkbox'ı bekleniyor...")
-                current_id = global_ids['checkbox_start'] + 2  # Üçüncü checkbox için
+                # Wait for and click new checkbox
+                print("Waiting for second page checkbox...")
+                current_id = global_ids['checkbox_start'] + 2  # For third checkbox
                 checkbox_id = f"mat-mdc-checkbox-{current_id}-input"
                 checkbox3 = WebDriverWait(driver, 10).until(
                     EC.presence_of_element_located((By.XPATH, f'//*[@id="{checkbox_id}"]'))
                 )
                 driver.execute_script("arguments[0].click();", checkbox3)
                 time.sleep(1)
-                print("İkinci sayfa checkbox'ı işaretlendi")
+                print("Second page checkbox checked")
                 
-                # Continue butonuna tıkla
+                # Click Continue button
                 continue_button = WebDriverWait(driver, 10).until(
                     EC.element_to_be_clickable((By.CSS_SELECTOR, "button.mdc-button"))
                 )
                 driver.execute_script("arguments[0].click();", continue_button)
-                print("Continue butonuna tıklandı")
+                print("Clicked on Continue button")
                 time.sleep(3)
                 
-                # Form sayfası kontrolü ve doldurma
+                # Form page check and fill
                 if "your-details" in driver.current_url:
-                    print("\nForm sayfasına ulaşıldı, form dolduruluyor...")
+                    print("\nReached form page, filling form...")
                     user_data = {
                         'first_name': 'Yusuf',
                         'last_name': 'Aydin',  # AYDIN -> Aydin
                         'gender': 'Male',
-                        'nationality': 'Turkiye',  # Turkey -> Turkiye olarak değiştirildi
+                        'nationality': 'Turkiye',  # Turkey -> Turkiye
                         'passport': 'U123456',
                         'country_code': '90',  # Removed +
                         'phone': '5551234567',
@@ -511,30 +544,30 @@ def check_appointments(driver):
                     }
                     
                     if fill_form(driver, user_data, global_ids['input_start'], global_ids['select_start']):
-                        print("Form dolduruldu ve kaydedildi")
+                        print("Form filled and saved")
                     else:
-                        print("Form doldurma başarısız")
-                        raise Exception("Form doldurma hatası")
+                        print("Form filling failed")
+                        raise Exception("Form filling error")
                     
             except Exception as e:
-                print(f"İkinci sayfa işlem hatası: {str(e)}")
+                print(f"Second page operation error: {str(e)}")
                 raise
 
-            # Form doldurulduktan sonra randevu seçim işlemlerine devam et
+            # Continue with appointment selection after form is filled
             if "applicationdetails" in driver.current_url:
                 try:
-                    print("\nRandevu seçim işlemi başlıyor...")
-                    print(f"Kullanılan Select ID: {global_ids['select_start']}")
-                    time.sleep(3)  # Sayfanın tam yüklenmesini bekle
+                    print("\nAppointment selection process starts...")
+                    print(f"Used Select ID: {global_ids['select_start']}")
+                    time.sleep(3)  # Wait for page to fully load
                     
-                    # Sayfanın yüklenmesini bekle
+                    # Wait for page to load
                     WebDriverWait(driver, 10).until(
                         EC.presence_of_element_located((By.CSS_SELECTOR, ".mat-mdc-form-field"))
                     )
                     
-                    # İlk dropdown (Uzun Dönem)
+                    # First dropdown (Long Term)
                     try:
-                        print(f"İlk dropdown aranıyor (ID: {global_ids['select_start'] + 4})...")
+                        print(f"Searching for first dropdown (ID: {global_ids['select_start'] + 4})...")
                         first_dropdown = WebDriverWait(driver, 10).until(
                             EC.presence_of_element_located((By.CSS_SELECTOR, f"[id='mat-select-value-{global_ids['select_start'] + 4}']"))
                         )
@@ -543,7 +576,7 @@ def check_appointments(driver):
                         driver.execute_script("arguments[0].click();", first_dropdown)
                         time.sleep(2)
                         
-                        # "1 - Uzun Donem" seçeneğini seç
+                        # Select "1 - Uzun Donem" option
                         long_term_option = WebDriverWait(driver, 10).until(
                             EC.presence_of_element_located((By.XPATH, "//span[normalize-space()='1 - Uzun Donem']"))
                         )
@@ -551,12 +584,12 @@ def check_appointments(driver):
                         time.sleep(2)
                         
                     except Exception as e:
-                        print(f"İlk dropdown hatası: {str(e)}")
+                        print(f"First dropdown error: {str(e)}")
                         raise
                     
-                    # İkinci dropdown (ERASMUS/NAWA/ECS)
+                    # Second dropdown (ERASMUS/NAWA/ECS)
                     try:
-                        print(f"İkinci dropdown aranıyor (ID: {global_ids['select_start'] + 6})...")
+                        print(f"Searching for second dropdown (ID: {global_ids['select_start'] + 6})...")
                         second_dropdown = WebDriverWait(driver, 10).until(
                             EC.presence_of_element_located((By.CSS_SELECTOR, f"[id='mat-select-value-{global_ids['select_start'] + 6}']"))
                         )
@@ -565,7 +598,7 @@ def check_appointments(driver):
                         driver.execute_script("arguments[0].click();", second_dropdown)
                         time.sleep(2)
                         
-                        # "5-ERASMUS/NAWA/ECS" seçeneğini seç
+                        # Select "5-ERASMUS/NAWA/ECS" option
                         erasmus_option = WebDriverWait(driver, 10).until(
                             EC.presence_of_element_located((By.XPATH, "//span[normalize-space()='5-ERASMUS/NAWA/ECS']"))
                         )
@@ -573,17 +606,17 @@ def check_appointments(driver):
                         time.sleep(2)
                         
                     except Exception as e:
-                        print(f"İkinci dropdown hatası: {str(e)}")
+                        print(f"Second dropdown error: {str(e)}")
                         raise
                     
-                    while True:  # Randevu bulunana kadar döngüye devam et
+                    while True:  # Continue loop until appointment is found
                         try:
                             error_message = WebDriverWait(driver, 3).until(
                                 EC.presence_of_element_located((By.CSS_SELECTOR, "div.errorMessage.c-brand-error"))
                             )
-                            print("Randevu bulunamadı, tekrar deneniyor...")
+                            print("No appointment found, retrying...")
                             
-                            # Dashboard'a dön
+                            # Return to dashboard
                             account_button = WebDriverWait(driver, 10).until(
                                 EC.element_to_be_clickable((By.XPATH, '//*[@id="navbarDropdown"]'))
                             )
@@ -594,74 +627,79 @@ def check_appointments(driver):
                                 EC.element_to_be_clickable((By.XPATH, '//*[@id="navbarToggle"]/ul/li/div/a[1]'))
                             )
                             dashboard_link.click()
-                            print("Dashboard'a dönülüyor...")
+                            print("Returning to dashboard...")
                             time.sleep(5)
                             
-                            # ID'leri güncelle ve yeniden başla
-                            global_ids['checkbox_start'] += 3  # Her ID'ye 3 ekle
-                            global_ids['input_start'] += 6     # Input ID'leri 6'şar artıyor
-                            global_ids['select_start'] += 10   # Select ID'leri 10'ar artıyor
-                            print(f"ID'ler güncellendi - Yeni değerler: Checkbox: {global_ids['checkbox_start']}, Input: {global_ids['input_start']}, Select: {global_ids['select_start']}")
-                            break  # İç while döngüsünden çık, dış while döngüsüne dön
+                            # Update IDs and restart
+                            global_ids['checkbox_start'] += 3  # Add 3 to each ID
+                            global_ids['input_start'] += 6     # Input IDs increase by 6
+                            global_ids['select_start'] += 10   # Select IDs increase by 10
+                            print(f"IDs updated - New values: Checkbox: {global_ids['checkbox_start']}, Input: {global_ids['input_start']}, Select: {global_ids['select_start']}")
+                            break  # Exit inner while loop, return to outer while loop
                             
                         except:
-                            print("Randevu kontrol ediliyor...")
-                            # Hata mesajı yoksa üçüncü dropdown'ı kontrol et
+                            print("Checking appointment...")
+                            # If no error message, check third dropdown
                             third_dropdown = WebDriverWait(driver, 5).until(
                                 EC.element_to_be_clickable((By.CSS_SELECTOR, f"#mat-select-value-{global_ids['select_start'] + 8}"))
                             )
                             if "Uygulama merkezinizi seçin" in third_dropdown.text:
-                                print("Randevu bulundu!")
+                                print("Appointment found!")
                                 play_success_sound()  # Already exists
-                                input("İşleme devam etmek için Enter'a basın...")  # Already exists
+                                input("Press Enter to continue...")  # Already exists
                                 return True
                 
                 except Exception as e:
-                    print(f"Randevu seçim hatası: {e}")
-                    play_error_sound()  # Genel hata durumunda da ses çal
-                    # Hata durumunda da ID'leri güncelle ve tekrar dene
+                    print(f"Appointment selection error: {e}")
+                    play_error_sound()  # Play error sound for general error
+                    # Update IDs and retry in case of error
                     global_ids['checkbox_start'] += 3
                     global_ids['input_start'] += 6
                     global_ids['select_start'] += 10
-                    print(f"Hata sonrası ID'ler güncellendi - Yeni değerler: Checkbox: {global_ids['checkbox_start']}, Input: {global_ids['input_start']}, Select: {global_ids['select_start']}")
+                    print(f"IDs updated after error - New values: Checkbox: {global_ids['checkbox_start']}, Input: {global_ids['input_start']}, Select: {global_ids['select_start']}")
                     continue
 
         except Exception as e:
-            print(f"\nHATA DETAYI:")
-            print(f"Tip: {type(e).__name__}")
-            print(f"Mesaj: {str(e)}")
-            play_error_sound()  # Genel hata durumunda da ses çal
-            # Hata durumunda da ID'leri güncelle ve tekrar dene
+            print(f"\nERROR DETAILS:")
+            print(f"Type: {type(e).__name__}")
+            print(f"Message: {str(e)}")
+            play_error_sound()  # Play error sound for general error
+            # Update IDs and retry in case of error
             global_ids['checkbox_start'] += 3
             global_ids['input_start'] += 6
             global_ids['select_start'] += 10
-            print(f"Genel hata sonrası ID'ler güncellendi - Yeni değerler: Checkbox: {global_ids['checkbox_start']}, Input: {global_ids['input_start']}, Select: {global_ids['select_start']}")
+            print(f"IDs updated after general error - New values: Checkbox: {global_ids['checkbox_start']}, Input: {global_ids['input_start']}, Select: {global_ids['select_start']}")
             continue
 
 def start_bot():
-    print("Chrome otomatik olarak debug modunda başlatılacak...")
+    """
+    Main entry point for the VFS appointment booking bot.
+    Handles initialization and main program flow.
+    """
+    print("Starting Chrome in debug mode...")
     if not start_chrome_debug():
-        print("Chrome başlatılamadı!")
+        print("Failed to start Chrome!")
         return
         
-    print("\n1. Açılan Chrome penceresinde VFS sitesine giriş yapın")
-    print("2. Dashboard sayfasına geldikten sonra Enter'a basın...")
+    print("\n1. Log in to the VFS site in the opened Chrome window")
+    print("2. After reaching the Dashboard page, press Enter...")
     input()
 
     try:
         driver = connect_to_existing_browser()
-        print("Mevcut Chrome oturumuna bağlanıldı")
+        print("Connected to existing Chrome session")
         
-        # Randevu kontrolü yap
+        # Check appointments
         check_appointments(driver)
         
-    except Exception as e:        print(f"Bağlantı hatası: {e}")
+    except Exception as e:        
+        print(f"Connection error: {e}")
     
     finally:
-        print("\nİşlem tamamlandı. Çıkmak için Enter'a basın...")
+        print("\nProcess completed. Press Enter to exit...")
         input()
 
 if __name__ == "__main__":
-    # Önce gerekli kütüphaneyi yükle
+    # Ensure webdriver-manager is installed for automatic ChromeDriver management
     # pip install webdriver-manager
     start_bot()
