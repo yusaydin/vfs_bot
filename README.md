@@ -6,7 +6,6 @@ This project automates the process of booking appointments on the VFS Global web
 
 ## ✨ Features
 
-- **Automated Login**: Secure and efficient login with user credentials.
 - **Appointment Search**: Finds available slots based on user preferences (date, location).
 - **Slot Selection**: Automatically books the best available slot.
 - **Error Handling**: Identifies and manages common website issues.
@@ -27,8 +26,8 @@ Ensure you have the following installed:
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/yourusername/vfs-appointment-bot.git
-   cd vfs-appointment-bot
+   git clone https://github.com/yusaydin/vfs_bot.git
+   cd vfs_bot
    ```
 
 2. **Install Dependencies**:
@@ -80,7 +79,6 @@ pip install -r requirements.txt
 ## 🔎 Roadmap
 
 - Multi-user support.
-- Captcha-solving mechanism.
 - Additional language support.
 - Enhanced error recovery.
 
