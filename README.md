@@ -126,7 +126,6 @@ For questions, suggestions, or collaboration opportunities, reach out:
 - **Author**: Yusuf Aydın
 - **Email**: [yusuf.aydin@ogr.ksbu.edu.tr](mailto:yusuf.aydin@ogr.ksbu.edu.tr)
 - **GitHub**: [yourusername](https://github.com/yusaydin)
-- **Instagram**: [yus.aydin](https://instagram.com/yus.aydin)
 
 ---
 
